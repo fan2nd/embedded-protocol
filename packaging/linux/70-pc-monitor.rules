@@ -1,0 +1,2 @@
+# Native USB CDC demo only. Desktop users receive access via logind/uaccess.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="cafe", ATTRS{idProduct}=="4001", TAG+="uaccess"

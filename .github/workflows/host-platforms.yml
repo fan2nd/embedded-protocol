@@ -1,0 +1,69 @@
+name: Host platform builds
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'host/**'
+      - 'dashboard/**'
+      - '3rd/tiny-ui/**'
+      - 'packaging/**'
+      - 'tools/build-host*'
+      - '.github/workflows/host-platforms.yml'
+  pull_request:
+    paths:
+      - 'host/**'
+      - 'dashboard/**'
+      - '3rd/tiny-ui/**'
+      - 'packaging/**'
+      - 'tools/build-host*'
+      - '.github/workflows/host-platforms.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-15
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
+          rustup target add '${{ matrix.target }}'
+      - name: Check and test on native OS
+        run: |
+          cargo fmt --manifest-path host/Cargo.toml -- --check
+          cargo test --locked --manifest-path host/Cargo.toml --target '${{ matrix.target }}'
+          cargo clippy --locked --manifest-path host/Cargo.toml --target '${{ matrix.target }}' --all-targets -- -D warnings
+      - name: Package
+        run: sh tools/build-host.sh '${{ matrix.target }}'
+      - name: Native smoke run without USB
+        run: |
+          exe='host/target/${{ matrix.target }}/release/pc-monitor-host'
+          if [[ '${{ runner.os }}' == 'Windows' ]]; then exe="$exe.exe"; fi
+          "$exe" --demo --dry-run --count 2 --interval 0.25
+          "$exe" --dry-run --count 2
+          "$exe" --list-interfaces
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pc-monitor-host-${{ matrix.target }}
+          path: output/pc-monitor-host-${{ matrix.target }}.tar.gz
+          if-no-files-found: error

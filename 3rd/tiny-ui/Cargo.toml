@@ -1,0 +1,9 @@
+[package]
+name = "tiny-ui"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Allocation-free embedded-graphics components and retained scene"
+[workspace]
+[dependencies]
+embedded-graphics = "0.8.1"

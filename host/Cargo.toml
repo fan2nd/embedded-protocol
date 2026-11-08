@@ -1,0 +1,14 @@
+[package]
+name = "pc-monitor-host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+dashboard = { path = "../dashboard" }
+sysinfo = { version = "=0.38.4", default-features = false, features = ["system", "network"] }
+serialport = { version = "=4.10.1", default-features = false }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
