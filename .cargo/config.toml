@@ -1,0 +1,7 @@
+# Only firmware explicitly targeting Cortex-M uses this linker script.
+# Native host commands keep the machine's default target.
+[target.thumbv8m.main-none-eabihf]
+rustflags = ["-C", "link-arg=-Tlink.x"]
+
+[alias]
+build-rp2350 = "build --release -p rp2350-monitor --target thumbv8m.main-none-eabihf"

@@ -1,0 +1,10 @@
+[package]
+name = "rp2350-dashboard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+embedded-graphics.workspace = true
+monitor-protocol.workspace = true
+heapless = "=0.8.0"
+tiny-ui.workspace = true

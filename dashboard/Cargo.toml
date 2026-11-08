@@ -1,9 +1,0 @@
-[package]
-name = "dashboard"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-embedded-graphics = "=0.8.2"
-heapless = "=0.8.0"
-tiny-ui = { path = "../3rd/tiny-ui" }

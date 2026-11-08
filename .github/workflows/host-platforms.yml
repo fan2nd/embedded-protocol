@@ -3,17 +3,23 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'host/**'
-      - 'dashboard/**'
-      - '3rd/tiny-ui/**'
+      - 'apps/host/**'
+      - 'crates/monitor-protocol/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/**'
+      - 'docs/**'
       - 'packaging/**'
       - 'tools/build-host*'
       - '.github/workflows/host-platforms.yml'
   pull_request:
     paths:
-      - 'host/**'
-      - 'dashboard/**'
-      - '3rd/tiny-ui/**'
+      - 'apps/host/**'
+      - 'crates/monitor-protocol/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.cargo/**'
+      - 'docs/**'
       - 'packaging/**'
       - 'tools/build-host*'
       - '.github/workflows/host-platforms.yml'
@@ -50,14 +56,14 @@ jobs:
           rustup target add '${{ matrix.target }}'
       - name: Check and test on native OS
         run: |
-          cargo fmt --manifest-path host/Cargo.toml -- --check
-          cargo test --locked --manifest-path host/Cargo.toml --target '${{ matrix.target }}'
-          cargo clippy --locked --manifest-path host/Cargo.toml --target '${{ matrix.target }}' --all-targets -- -D warnings
+          cargo fmt -p monitor-protocol -p pc-monitor-host -- --check
+          cargo test --locked -p monitor-protocol -p pc-monitor-host --target '${{ matrix.target }}'
+          cargo clippy --locked -p monitor-protocol -p pc-monitor-host --target '${{ matrix.target }}' --all-targets -- -D warnings
       - name: Package
         run: sh tools/build-host.sh '${{ matrix.target }}'
       - name: Native smoke run without USB
         run: |
-          exe='host/target/${{ matrix.target }}/release/pc-monitor-host'
+          exe='target/${{ matrix.target }}/release/pc-monitor-host'
           if [[ '${{ runner.os }}' == 'Windows' ]]; then exe="$exe.exe"; fi
           "$exe" --demo --dry-run --count 2 --interval 0.25
           "$exe" --dry-run --count 2

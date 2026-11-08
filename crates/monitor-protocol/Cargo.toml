@@ -1,0 +1,5 @@
+[package]
+name = "monitor-protocol"
+version = "0.1.0"
+edition = "2021"
+description = "Allocation-free PCMON1 resource-monitoring wire protocol"

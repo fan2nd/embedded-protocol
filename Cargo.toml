@@ -1,0 +1,20 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/monitor-protocol",
+    "apps/host",
+    "examples/rp2350/ui",
+    "examples/rp2350/firmware",
+]
+default-members = ["crates/monitor-protocol", "apps/host"]
+
+[workspace.dependencies]
+monitor-protocol = { path = "crates/monitor-protocol" }
+embedded-graphics = "=0.8.2"
+tiny-ui = { git = "https://github.com/fan2nd/tinyui.git", rev = "8a628f031ee692bcfdab5a548e07cde2be760982" }
+
+[profile.release]
+debug = 2
+opt-level = "s"
+lto = true
+codegen-units = 1
