@@ -1,0 +1,11 @@
+[package]
+name = "pcmon-storage-check"
+version = "0.1.0"
+edition = "2021"
+publish = false
+[workspace]
+[dependencies]
+embassy-usb = "=0.5.1"
+embassy-sync = "=0.7.2"
+embassy-futures = "=0.1.2"
+critical-section = { version = "1", features = ["std"] }

@@ -3,6 +3,7 @@
 
 mod display;
 mod lcd;
+mod storage;
 
 use core::{cell::RefCell, ptr::addr_of_mut};
 use embassy_executor::{Executor, Spawner};
@@ -59,7 +60,9 @@ static FRAME_B: StaticCell<FrameBytes> = StaticCell::new();
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
-    let p = embassy_rp::init(Default::default());
+    let mut config = embassy_rp::config::Config::default();
+    config.clocks = embassy_rp::clocks::ClockConfig::system_freq(150_000_000).unwrap();
+    let p = embassy_rp::init(config);
     // Move only USB to core 1. The driver (and its IRQ) is initialized there.
     spawn_core1(
         p.CORE1,
@@ -118,7 +121,7 @@ async fn main(spawner: Spawner) {
         } else {
             led.set_high();
         }
-        ui.update(snapshot.metrics, live, page, new_sample);
+        ui.update(snapshot.metrics, live, page, new_sample, now);
         if let Some(damage) = ui.damage() {
             // Alternating buffers are one update apart. Repair the previous damage
             // in RAM, but send only this update's damage to the serial LCD.
@@ -131,7 +134,8 @@ async fn main(spawner: Spawner) {
             // Ownership comes back only after DMA AND SPI FIFO draining complete.
             frame = display::FREE.receive().await;
         }
-        Timer::after_millis(20).await;
+        // Poll keys/offline state with at most 1 ms added display latency.
+        Timer::after_millis(1).await;
     }
 }
 
@@ -145,10 +149,11 @@ async fn usb_core(usb_peripheral: Peri<'static, USB>) {
     config.serial_number = Some("PCMON-DEMO-001");
     config.max_power = 250;
     config.max_packet_size_0 = 64;
-    let mut config_descriptor = [0; 256];
+    let mut config_descriptor = [0; 384];
     let mut bos_descriptor = [0; 256];
     let mut control_buffer = [0; 64];
     let mut state = State::new();
+    let mut disk_control = storage::Control::new();
     let mut builder = Builder::new(
         driver,
         config,
@@ -158,6 +163,7 @@ async fn usb_core(usb_peripheral: Peri<'static, USB>) {
         &mut control_buffer,
     );
     let mut cdc = CdcAcmClass::new(&mut builder, &mut state, 64);
+    let mut disk = storage::Disk::new(&mut builder, &mut disk_control);
     let mut device = builder.build();
     let receiver = async {
         loop {
@@ -193,5 +199,5 @@ async fn usb_core(usb_peripheral: Peri<'static, USB>) {
             SHARED.lock(|s| s.borrow_mut().valid = false);
         }
     };
-    join(device.run(), receiver).await;
+    join(device.run(), join(receiver, disk.run())).await;
 }

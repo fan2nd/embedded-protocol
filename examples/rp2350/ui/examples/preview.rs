@@ -12,6 +12,7 @@ struct Preview {
     previous: Option<Rectangle>,
     back: usize,
     commits: usize,
+    now_ms: u64,
     payload: usize,
 }
 impl Preview {
@@ -24,11 +25,15 @@ impl Preview {
             previous: None,
             back: 0,
             commits: 0,
+            now_ms: 0,
             payload: 0,
         }
     }
     fn tick(&mut self, m: Metrics, live: bool, page: bool, sample: bool) -> Option<Rectangle> {
-        self.ui.update(m, live, page, sample);
+        if sample {
+            self.now_ms += 500;
+        }
+        self.ui.update(m, live, page, sample, self.now_ms);
         let dirty = self.ui.damage();
         if let Some(dirty) = dirty {
             self.ui
@@ -175,6 +180,20 @@ fn main() {
     m.memory = 1000;
     preview.tick(m, true, false, true);
     preview.tick(m, true, true, true);
+    // Exercise one-minute windows at both supported interval extremes, plus aging
+    // with no new sample. Pixel comparisons still run for every update.
+    for interval in [250, 2000] {
+        for n in 0..(65_000 / interval) {
+            preview.now_ms += interval;
+            m.cpu = (n * 37 % 1001) as u32;
+            m.memory = 1000 - m.cpu;
+            // tick(sample=true) advances another 500 ms; compensate here.
+            preview.now_ms -= 500.min(preview.now_ms);
+            preview.tick(m, true, true, true);
+        }
+        preview.now_ms += 61_000;
+        assert!(preview.tick(m, true, true, false).is_some());
+    }
     println!("{} alternating-buffer commits match full rendering and simulated LCD; 100 idle ticks send nothing",preview.commits);
     println!(
         "Total transmitted {} bytes vs {} full-frame bytes",

@@ -103,7 +103,7 @@ Linux 用户需拥有对应串口权限。仓库的 [示例 udev 规则](packagi
 ## RP2350 示例
 
 [examples/rp2350/README.md](examples/rp2350/README.md) 包含该板的引脚、屏幕参数、构建与烧录说明。
-示例使用固定提交的 [fan2nd/tinyui](https://github.com/fan2nd/tinyui)，Core 0 负责双缓冲/脏区/DMA 显示，Core 1 负责 USB。
+示例使用固定提交的 [fan2nd/tinyui](https://github.com/fan2nd/tinyui)，Core 0 负责双缓冲/脏区/DMA 显示，Core 1 负责 USB CDC 与只读虚拟 U 盘；盘内附 Windows x64、Linux x64、macOS ARM64 上位机包。
 该目录可以独立替换；协议 crate 和上位机不依赖其 UI、HAL 或硬件文件。
 
 ## 检查

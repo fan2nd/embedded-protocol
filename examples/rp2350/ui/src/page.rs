@@ -23,7 +23,8 @@ const CYAN: Rgb565 = Rgb565::new(4, 54, 29);
 const PURPLE: Rgb565 = Rgb565::new(23, 32, 31);
 const GREEN: Rgb565 = Rgb565::new(13, 55, 17);
 const AMBER: Rgb565 = Rgb565::new(31, 43, 8);
-const HISTORY: usize = 106;
+const HISTORY: usize = 241;
+const WINDOW_MS: u64 = 60_000;
 
 const CPU_VALUE: u16 = 20;
 const MEM_VALUE: u16 = 21;
@@ -34,9 +35,9 @@ const UPTIME: u16 = 24;
 const fn rect(x: i32, y: i32, w: u32, h: u32) -> Rectangle {
     Rectangle::new(Point::new(x, y), Size::new(w, h))
 }
-const MEM_RING: Rectangle = rect(166, 42, 52, 52);
-const CPU_PLOT: Rectangle = rect(15, 76, 120, 18);
-const BIG_PLOT: Rectangle = rect(14, 46, 212, 43);
+const CPU_RING: Rectangle = rect(34, 42, 56, 56);
+const MEM_RING: Rectangle = rect(151, 42, 56, 56);
+const BIG_PLOT: Rectangle = rect(38, 46, 188, 43);
 
 pub struct Dashboard {
     scene: Scene<24>,
@@ -46,6 +47,8 @@ pub struct Dashboard {
     page: bool,
     cpu: [u16; HISTORY],
     memory: [u16; HISTORY],
+    timestamps: [u64; HISTORY],
+    now_ms: u64,
     head: usize,
     count: usize,
 }
@@ -64,6 +67,8 @@ impl Dashboard {
             page: false,
             cpu: [0; HISTORY],
             memory: [0; HISTORY],
+            timestamps: [0; HISTORY],
+            now_ms: 0,
             head: 0,
             count: 0,
         };
@@ -71,7 +76,9 @@ impl Dashboard {
         this
     }
     /// `new_sample` distinguishes a real host update from the UI/key polling tick.
-    pub fn update(&mut self, m: Metrics, live: bool, page: bool, new_sample: bool) {
+    pub fn update(&mut self, m: Metrics, live: bool, page: bool, new_sample: bool, now_ms: u64) {
+        let time_changed = now_ms / 1000 != self.now_ms / 1000;
+        self.now_ms = now_ms;
         let old = self.metrics;
         let rebuild = live != self.live || (live && page != self.page);
         if live && !self.live {
@@ -82,6 +89,7 @@ impl Dashboard {
         self.live = live;
         self.page = page;
         if live && new_sample {
+            self.timestamps[self.head] = now_ms;
             self.cpu[self.head] = m.cpu.min(1000) as u16;
             self.memory[self.head] = m.memory.min(1000) as u16;
             self.head = (self.head + 1) % HISTORY;
@@ -95,20 +103,18 @@ impl Dashboard {
             return;
         }
         if page {
-            if new_sample {
+            if new_sample || time_changed {
                 self.scene.invalidate(Some(BIG_PLOT));
             }
             self.set_label(UPTIME, &uptime(m.uptime_s));
         } else {
             if m.cpu != old.cpu {
-                self.set_label(CPU_VALUE, &percent(m.cpu));
+                self.scene.invalidate(Some(CPU_RING));
+                self.set_label(CPU_VALUE, &memory_percent(m.cpu));
             }
             if m.memory != old.memory {
                 self.scene.invalidate(Some(MEM_RING));
                 self.set_label(MEM_VALUE, &memory_percent(m.memory));
-            }
-            if new_sample {
-                self.scene.invalidate(Some(CPU_PLOT));
             }
             self.set_label(RX_VALUE, &rate(m.rx_kib));
             self.set_label(TX_VALUE, &rate(m.tx_kib));
@@ -171,7 +177,7 @@ impl Dashboard {
             foreground: color,
             font: FontSize::Normal,
             padding: 0,
-            align: if id == MEM_VALUE {
+            align: if id == MEM_VALUE || id == CPU_VALUE {
                 Alignment::Center
             } else {
                 Alignment::Left
@@ -241,7 +247,16 @@ impl Dashboard {
             self.panel(4, rect(6, 24, 228, 74), CARD, EDGE);
             self.label(5, rect(21, 28, 64, 12), "CPU", CYAN, TextSize::Small);
             self.label(6, rect(72, 28, 64, 12), "MEM", PURPLE, TextSize::Small);
-            self.label(7, rect(166, 28, 60, 12), "0 - 100%", MUTED, TextSize::Small);
+            self.label(
+                7,
+                rect(150, 28, 76, 12),
+                "60s / 100%",
+                MUTED,
+                TextSize::Small,
+            );
+            self.label(10, rect(10, 41, 26, 12), "100%", MUTED, TextSize::Small);
+            self.label(11, rect(16, 62, 20, 12), "50%", MUTED, TextSize::Small);
+            self.label(12, rect(22, 83, 14, 12), "0%", MUTED, TextSize::Small);
             self.panel(8, rect(6, 102, 228, 27), CARD, EDGE);
             self.label(
                 UPTIME,
@@ -252,32 +267,26 @@ impl Dashboard {
             );
             self.label(9, rect(193, 108, 30, 14), "2 / 2", MUTED, TextSize::Small);
         } else {
-            self.panel(4, rect(6, 24, 139, 78), CARD, EDGE);
-            self.panel(5, rect(151, 24, 83, 78), CARD, EDGE);
-            self.label(6, rect(15, 29, 94, 13), "PROCESSOR", CYAN, TextSize::Small);
-            self.label(7, rect(173, 29, 50, 13), "MEMORY", PURPLE, TextSize::Small);
+            self.panel(4, rect(6, 24, 111, 78), CARD, EDGE);
+            self.panel(5, rect(123, 24, 111, 78), CARD, EDGE);
+            self.label(6, rect(35, 29, 64, 13), "CPU LOAD", CYAN, TextSize::Small);
+            self.label(7, rect(161, 29, 50, 13), "MEMORY", PURPLE, TextSize::Small);
             self.label(
                 CPU_VALUE,
-                rect(15, 45, 58, 25),
-                &percent(self.metrics.cpu),
+                rect(42, 54, 40, 21),
+                &memory_percent(self.metrics.cpu),
                 TEXT,
                 TextSize::Value,
             );
-            self.label(
-                8,
-                rect(65, 53, 67, 12),
-                "% CPU LOAD",
-                MUTED,
-                TextSize::Small,
-            );
+            self.label(8, rect(58, 77, 8, 12), "%", MUTED, TextSize::Small);
             self.label(
                 MEM_VALUE,
-                rect(173, 54, 40, 21),
+                rect(159, 54, 40, 21),
                 &memory_percent(self.metrics.memory),
                 TEXT,
                 TextSize::Value,
             );
-            self.label(9, rect(189, 75, 8, 12), "%", MUTED, TextSize::Small);
+            self.label(9, rect(175, 77, 8, 12), "%", MUTED, TextSize::Small);
             self.panel(10, rect(6, 107, 111, 23), CARD, EDGE);
             self.panel(11, rect(123, 107, 111, 23), CARD, EDGE);
             self.label(
@@ -324,8 +333,9 @@ impl Dashboard {
         }
         if self.page {
             for y in [46, 67, 88] {
-                line(t, Point::new(14, y), Point::new(225, y), EDGE, 1)?;
+                line(t, Point::new(35, y), Point::new(225, y), EDGE, 1)?;
             }
+            line(t, Point::new(37, 46), Point::new(37, 88), MUTED, 1)?;
             self.plot(t, BIG_PLOT, &self.memory, PURPLE)?;
             self.plot(t, BIG_PLOT, &self.cpu, CYAN)?;
             Circle::new(Point::new(14, 31), 4)
@@ -341,8 +351,7 @@ impl Dashboard {
             line(t, Point::new(19, 116), Point::new(22, 117), MUTED, 1)?;
         } else {
             meter(t, MEM_RING, self.metrics.memory, PURPLE)?;
-            line(t, Point::new(15, 93), Point::new(134, 93), EDGE, 1)?;
-            self.plot(t, CPU_PLOT, &self.cpu, CYAN)?;
+            meter(t, CPU_RING, self.metrics.cpu, CYAN)?;
             arrow(t, Point::new(18, 113), true, CYAN)?;
             arrow(t, Point::new(135, 113), false, PURPLE)?;
         }
@@ -360,38 +369,28 @@ impl Dashboard {
             return Ok(());
         }
         let mut t = t.clipped(&bounds);
-        let n = self.count.min(bounds.size.width as usize / 2);
-        let start = (self.head + HISTORY - n) % HISTORY;
-        let x = bounds.top_left.x + bounds.size.width as i32 - (n as i32 - 1) * 2 - 1;
+        let start = (self.head + HISTORY - self.count) % HISTORY;
         let bottom = bounds.top_left.y + bounds.size.height as i32 - 1;
-        for i in 1..n {
-            let a = values[(start + i - 1) % HISTORY] as i32;
-            let b = values[(start + i) % HISTORY] as i32;
-            line(
-                &mut t,
-                Point::new(
-                    x + (i as i32 - 1) * 2,
-                    bottom - a * (bounds.size.height as i32 - 1) / 1000,
-                ),
-                Point::new(
-                    x + i as i32 * 2,
-                    bottom - b * (bounds.size.height as i32 - 1) / 1000,
-                ),
-                color,
-                1,
-            )?;
+        let mut previous = None;
+        for i in 0..self.count {
+            let index = (start + i) % HISTORY;
+            let age = self.now_ms.saturating_sub(self.timestamps[index]);
+            if age > WINDOW_MS {
+                previous = None;
+                continue;
+            }
+            let point = Point::new(
+                bounds.top_left.x
+                    + ((WINDOW_MS - age) * (bounds.size.width - 1) as u64 / WINDOW_MS) as i32,
+                bottom - values[index] as i32 * (bounds.size.height as i32 - 1) / 1000,
+            );
+            if let Some(last) = previous {
+                line(&mut t, last, point, color, 1)?;
+            }
+            previous = Some(point);
         }
         Ok(())
     }
-}
-fn percent(value: u32) -> String<16> {
-    let mut s = String::new();
-    if value >= 1000 {
-        let _ = write!(s, "100");
-    } else {
-        let _ = write!(s, "{}.{:01}", value / 10, value % 10);
-    }
-    s
 }
 fn memory_percent(value: u32) -> String<16> {
     let mut s = String::new();
@@ -449,15 +448,15 @@ fn meter<D: DrawTarget<Color = Rgb565>>(
     let mut t = t.clipped(&bounds);
     let origin = bounds.top_left + Point::new(4, 4);
     let diameter = bounds.size.width - 8;
-    Circle::new(origin, diameter)
+    Arc::new(origin, diameter, 150.0f32.deg(), 240.0f32.deg())
         .into_styled(PrimitiveStyle::with_stroke(TRACK, 4))
         .draw(&mut t)?;
     if value > 0 {
         Arc::new(
             origin,
             diameter,
-            (-90.0f32).deg(),
-            (value.min(1000) as f32 * 0.36).deg(),
+            150.0f32.deg(),
+            (value.min(1000) as f32 * 0.24).deg(),
         )
         .into_styled(PrimitiveStyle::with_stroke(color, 4))
         .draw(&mut t)?;
