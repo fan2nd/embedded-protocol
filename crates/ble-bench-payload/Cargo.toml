@@ -1,0 +1,7 @@
+[package]
+name = "ble-bench-payload"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ble-link-protocol = { path = "../ble-link-protocol" }

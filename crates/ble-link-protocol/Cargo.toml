@@ -1,0 +1,5 @@
+[package]
+name = "ble-link-protocol"
+version = "0.1.0"
+edition = "2021"
+description = "Bounded HELLO/DATA/ACK link with fixed sliding window"

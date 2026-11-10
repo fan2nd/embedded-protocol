@@ -1,0 +1,8 @@
+[package]
+name = "dobt01-driver"
+version = "0.1.0"
+edition = "2021"
+description = "Allocation-free doBT-01X AT command/state engine, independent of UART HAL"
+
+[dependencies]
+at-transport = { path = "../at-transport" }

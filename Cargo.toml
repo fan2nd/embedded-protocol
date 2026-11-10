@@ -2,11 +2,19 @@
 resolver = "2"
 members = [
     "crates/monitor-protocol",
+    "crates/dobt01-driver",
+    "crates/dobt8as-driver",
+    "crates/at-transport",
+    "crates/ble-bench-protocol",
+    "crates/ble-link-protocol",
+    "crates/ble-bench-payload",
     "apps/host",
+    "apps/ble-bench-host",
     "examples/rp2350/ui",
     "examples/rp2350/firmware",
+    "examples/stm32g431/firmware",
 ]
-default-members = ["crates/monitor-protocol", "apps/host"]
+default-members = ["crates/monitor-protocol", "crates/dobt01-driver", "crates/dobt8as-driver", "crates/ble-bench-protocol", "apps/host"]
 
 [workspace.dependencies]
 monitor-protocol = { path = "crates/monitor-protocol" }

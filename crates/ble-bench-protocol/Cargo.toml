@@ -1,0 +1,5 @@
+[package]
+name = "ble-bench-protocol"
+version = "0.1.0"
+edition = "2021"
+description = "Bounded binary diagnostic frames for measuring BLE transparent UART goodput"

@@ -1,0 +1,8 @@
+[package]
+name = "dobt8as-driver"
+version = "0.1.0"
+edition = "2021"
+description = "Bounded no_std doBT-8AS slave AT driver"
+
+[dependencies]
+at-transport = { path = "../at-transport" }

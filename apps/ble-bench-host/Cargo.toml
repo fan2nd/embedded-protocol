@@ -1,0 +1,13 @@
+[package]
+name = "ble-bench-host"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ble-bench-payload = { path = "../../crates/ble-bench-payload" }
+ble-link-protocol = { path = "../../crates/ble-link-protocol" }
+bluest = "=0.6.9"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+futures-lite = "2"
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }

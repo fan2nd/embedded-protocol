@@ -1,13 +1,21 @@
-# 跨平台资源监视器
+# 嵌入式工具库
 
-这是一个以**资源监视协议和跨平台上位机**为核心的项目。
-电脑端采集 CPU、内存、网络速率与运行时间，通过公开的 PCMON1 协议发送给接收端。
-接收端可以使用不同 MCU、屏幕或其他软件实现；仓库附带的 RP2350 小屏仅是一个硬件示例，不是协议或上位机的依赖。
+本项目提供可复用的嵌入式设备驱动、字节流协议与硬件验证工具，按独立 crate 分层，通用库不绑定具体 MCU、引脚或业务应用。项目约束见 [AGENTS.md](AGENTS.md)。
+
+当前包含 doBT-01X、doBT-8AS 蓝牙模块 AT 驱动、BLE 透传测速工具，以及 PCMON1 资源监视器示例。电脑端资源采集和 RP2350 小屏是应用示例，不是通用驱动库的依赖。STM32G431 的 USART1 接入和 Mac 双向 BLE 实测见 [STM32G431 示例](examples/stm32g431/README.md)。
 
 ## 项目组成
 
 | 部分 | 位置 | 职责 |
 |---|---|---|
+| doBT-01X 驱动 | [crates/dobt01-driver](crates/dobt01-driver) | 无堆分配 AT 命令、响应解析、配置/透传状态管理 |
+| 历史 v3 测速帧 | [crates/ble-bench-protocol](crates/ble-bench-protocol) | 独立诊断帧、CRC32C、增量解码、有界确认重传窗口 |
+| AT 传输接口 | [crates/at-transport](crates/at-transport) | 调用方提供的有界传输和时间接口 |
+| doBT-8AS 驱动 | [crates/dobt8as-driver](crates/dobt8as-driver) | 独立从机 AT 驱动，尚未实机验证 |
+| BLE v6 链路 | [crates/ble-link-protocol](crates/ble-link-protocol) | 统一帧、CRC、固定滑动窗口与重传 |
+| 测速载荷 | [crates/ble-bench-payload](crates/ble-bench-payload) | 测试命令、统计及随机包长 |
+| Rust BLE 测速上位机 | [apps/ble-bench-host](apps/ble-bench-host) | Mac 原生通知、写队列背压、固定窗口双向测速与矩阵报告 |
+| STM32G431 示例 | [examples/stm32g431](examples/stm32g431) | USART1 PA9/PA10 接入、波特率探测、改名复位、双向测速 |
 | 协议规范 | [docs/protocol.md](docs/protocol.md) | 帧格式、握手、单位、边界与接收约定 |
 | 协议实现 | [crates/monitor-protocol](crates/monitor-protocol) | 无依赖、`no_std`、无堆分配的编码与流式解码 |
 | 上位机 | [apps/host](apps/host) | Windows / Linux / macOS 状态采集、串口发现、发送与重连 |
@@ -23,7 +31,7 @@
 
 协议不包含 GPIO、屏幕尺寸或 USB VID/PID。现有上位机实现的传输方式是串口/USB CDC；其他传输需自行适配字节流，并非已经实现 TCP 等传输。
 
-## 快速开始：只运行上位机
+## 资源监视器示例：只运行上位机
 
 开发环境需要 Rust stable 和系统原生链接器。运行已编译程序不需要 Rust 或 Python。
 在仓库根目录执行：
@@ -70,7 +78,7 @@ VPN、虚拟网卡或自定义名称可能影响默认统计范围，需精确�
 
 ## 构建与打包
 
-这是一个 Cargo workspace，根目录 `cargo build` / `cargo test` 默认只处理协议与上位机，不编译硬件固件。
+这是一个 Cargo workspace，根目录 `cargo build` / `cargo test` 默认处理通用驱动、协议库与资源监视器上位机，不编译硬件固件。
 所有组件共享根目录 `Cargo.lock`；硬件示例的 Git UI 依赖也记录在该锁文件中。
 
 ```sh
@@ -116,3 +124,5 @@ cargo tree -p pc-monitor-host
 ```
 
 固件和界面预览需显式构建，命令见对应示例。执行构建或测试不会自动烧录设备，也不会启动后台采集服务。
+
+BLE 当前规范见 [v6 协议](docs/ble-protocol.md)，模块手册见 [硬件资料](docs/hardware/README.md)。

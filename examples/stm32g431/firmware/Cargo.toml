@@ -1,0 +1,24 @@
+[package]
+name = "stm32g431-ble-bench"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ble-bench-payload = { path = "../../../crates/ble-bench-payload" }
+dobt01-driver = { path = "../../../crates/dobt01-driver" }
+ble-link-protocol = { path = "../../../crates/ble-link-protocol" }
+embassy-stm32 = { version = "=0.6.0", features = ["stm32g431cb", "memory-x", "time-driver-any", "defmt", "unstable-pac"] }
+embassy-executor = { version = "=0.9.1", features = ["arch-cortex-m", "executor-thread"] }
+embassy-time = { version = "=0.5.1", features = ["defmt"] }
+embedded-io-async = "0.7"
+cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7"
+defmt = "1"
+defmt-rtt = "1"
+panic-halt = "1"
+
+[[bin]]
+name = "stm32g431-ble-bench"
+path = "src/main.rs"
+test = false
+bench = false

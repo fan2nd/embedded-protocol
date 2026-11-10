@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 output/
 .DS_Store
+tmp/
+# Temporary hardware test records must not be committed.
+examples/**/results/
