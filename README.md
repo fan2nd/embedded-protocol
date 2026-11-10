@@ -94,8 +94,7 @@ sh tools/build-host.sh
 Windows 构建需要 MSVC Rust 和 Visual Studio C++ Build Tools；Linux 需要本地 C 工具链；macOS 需要 Xcode Command Line Tools。
 Linux GNU 二进制的 glibc 兼容范围取决于构建系统，不宣称跨所有发行版通用。
 
-[GitHub Actions](.github/workflows/host-platforms.yml) 配置了 Windows x64、Linux x64/ARM64、macOS Intel/Apple Silicon 五个平台的原生检查、采集冒烟运行和产物上传。
-本地验证环境是 Apple Silicon Mac；其他平台是否构建通过以对应 CI 结果为准，CI 不替代真实 USB 设备验证。
+本地验证环境是 Apple Silicon Mac；其他平台需在对应系统上自行构建和验证，构建检查不替代真实 USB 设备验证。
 
 ## 接入其他硬件
 
