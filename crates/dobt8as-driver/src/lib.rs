@@ -1,6 +1,5 @@
 //! doBT-8AS slave V1.1.5 AT driver. Not the 8AM or 8AMS command set.
 #![no_std]
-pub use at_transport::Transport;
 use core::fmt::Write;
 pub const BAUDS: [u32; 15] = [
     115200, 1200, 2400, 4800, 9600, 14400, 19200, 38400, 56000, 57600, 128000, 230400, 256000,
@@ -76,7 +75,7 @@ pub enum Error {
     Overflow,
     MissingValue,
     NotReady,
-    UseChangeBaud,
+    UseSendCommand,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Reply {
@@ -458,7 +457,7 @@ fn parse_line(line: &[u8]) -> Option<Reply> {
     };
     valid.then(|| reply(field, v)).flatten()
 }
-pub mod setup;
+pub mod transaction;
 
 #[cfg(test)]
 mod tests;

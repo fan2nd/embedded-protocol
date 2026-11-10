@@ -92,10 +92,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "at-transport"
-version = "0.1.0"
-
-[[package]]
 name = "autocfg"
 version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -607,14 +603,14 @@ dependencies = [
 name = "dobt01-driver"
 version = "0.1.0"
 dependencies = [
- "at-transport",
+ "embedded-io-async 0.7.0",
 ]
 
 [[package]]
 name = "dobt8as-driver"
 version = "0.1.0"
 dependencies = [
- "at-transport",
+ "embedded-io-async 0.7.0",
 ]
 
 [[package]]

@@ -2,7 +2,7 @@
 
 依据[doBT-8AS AT 手册](../../docs/hardware/dobt8as-at.pdf) 中 **doBT-8AS 从机 AT 指令手册 V1.1.5**（PDF 第 5–28 页）实现。后面的 doBT-8AM/8AMS 是其他型号，不混用。`no_std`、无堆分配，无 HAL、OS、板卡和业务名称依赖。
 
-共享 `at-transport::Transport`，与 `dobt01-driver` 独立；不把 01X 的 `AT+QT`、`AT+CTxx`、`AT+CZ` 用在 8AS 上。
+直接使用 `embedded_io_async::Read + Write`，与 `dobt01-driver` 独立；不把 01X 的 `AT+QT`、`AT+CTxx`、`AT+CZ` 用在 8AS 上。
 
 ## 支持范围
 
@@ -21,25 +21,28 @@
 1. `begin` 校验参数并编码完整 CRLF 命令；一条未完成时返回 Busy，输出缓冲不足不建立事务。
 2. `feed` 用 128 B 行缓冲接收；必须 CRLF 结束，超长行丢弃至 LF 后报 Overflow。返回值最多保留 96 B；不分配队列，调用方及时消费事件。
 3. 匹配的 `+KEY:value` 仅缓存为候选，收到后续 `OK` 才返回 Complete。孤立 OK 不算成功；无关参数行和连接通知不会完成当前事务。`ERR:n` 返回明确设备错误码。
-4. `execute` 调用传输适配器排空旧输入并发送，整条事务截止 800 ms，超时/I/O 失败清除 pending。AT 没有事务号，排空无法保证区分同类型迟到回复。
-5. `AT+BAUD=n` **立即生效**，旧波特率回复可能乱码。使用 `change_baud`：完整写入并 flush→切本地 UART→新波特率查询并验证。不等待旧速率 OK；普通 `execute(SetBaud)` 明确拒绝。
+4. `execute` 通过标准异步 `write_all`/`flush`/`read` 发送并等待匹配回复；按字节读取，不吞掉响应后的通知。调用方负责超时、旧输入排空、配置顺序及复位等待。事务 Future 被取消或 I/O 失败会释放 pending；EOF 与超时不同，返回 `UnexpectedEof`。AT 没有事务号，无法保证区分同类型迟到回复。
+5. `AT+BAUD=n` **立即生效**，使用 `send_command(SetBaud(...))` 仅发送并 flush，不等旧速率 OK；调用方切换本地 UART、排空旧响应，再 `execute(Query(Baud))` 回读验证。普通 `execute(SetBaud)` 返回 `UseSendCommand`，不隐式改硬件。
 
 ## 初始化与透传
 
+驱动不提供自动 configure 或波特率切换。调用方扫描各档波特率、设置名称和 LOG/低功耗、按需复位并等待，查询验证设置，最后设置并回读 CMD=0。低功耗造成漏收时，重试次数和超时均由调用方决定。不得与透传数据并发发送 AT。
+
 ```rust,ignore
 let mut driver = dobt8as_driver::Driver::new();
-let ready = driver.configure(&mut port, dobt8as_driver::setup::Options {
-    name: "my-device",
-    baud: 115200,
-    reset_wait_ms: 2000, // 调用方提供的复位稳定等待策略，不声称是手册硬性值。
-}).await?;
-// port 实现 at_transport::Transport；ready 不代表 BLE 已连接。
-// 应用验证二进制对端握手后：
+// io 实现 embedded_io_async::Read + Write；调用方为整个事务设置超时。
+let reply = driver.execute(&mut io, Command::Query(Field::Baud)).await?;
+// 改速率：仅提交命令，之后由调用方配置本地 UART 并回读校验。
+driver.send_command(&mut io, Command::SetBaud(115200)).await?;
+// ...调用方切换 UART、处理残留输入...
+let reply = driver.execute(&mut io, Command::Query(Field::Baud)).await?;
+assert_eq!(reply.number(), Some(115200));
+// ...设置并确认 CMD=0，验证二进制对端握手后...
 driver.confirm_peer();
 driver.enter_transparent()?;
 ```
 
-`configure` 扫描手册支持的波特率（每档最多 3 次查询），必要时改速率/名称，关闭 LOG 和低功耗，复位后回读速率/名称/LOG，重新禁用并回读低功耗，最后设置并回读 `AT+CMD=0`。Reset 的 OK 若因重启丢失可超时，但后续验证必须通过。返回 Ready 仅表示这些配置已经验证；LOG=0 后连接通知可能不再上报，因此使用外部验证握手确认连接。不得在有并发透传数据时运行 configure。
+`send_command` 成功仅表示本地写入完成，不代表模块执行成功，也不更新未经回读验证的状态。超时取消同样不能撤回已发送字节；再次发命令前由调用方让链路静止并排空旧回复。需要自行消费所有 URC 时，可使用 `begin`/`feed` 低层接口。
 
 **AT 防碰撞边界（PDF 第 19 页）：** `AT+CMD=0` 关闭连接后普通 AT 识别，但 `AT+CMD?` 和 `AT+CMD=...` 两种命令仍会被识别，不是完全关闭 AT 解释器。协议二进制包头、整帧 UART 提交和停止并发 AT 是应用侧约束，不能宣称任意切片数据绝对免碰撞。
 
@@ -47,7 +50,7 @@ driver.enter_transparent()?;
 
 ## 验证状态
 
-- 已有主机测试：参数与范围、MAC/UUID 编码、分块多行回复、URC 穿插、孤立 OK、溢出、ERR、透传门控、即时改波特率/失败回读、完整配置回读。
+- 已有主机测试：参数与范围、MAC/UUID 编码、分块多行回复、URC 穿插、孤立 OK、溢出、ERR、透传门控、异步 Pending/部分写入、EOF/I/O 失败、取消释放事务、不等待应答的波特率命令提交。
 - 可为 `thumbv7em-none-eabihf` 编译，无标准库依赖。
 - **未在 doBT-8AS 实物上验证**；当前 G431 接的是 doBT-01X，不能用其通过的测试冒充 8AS 验证。
 

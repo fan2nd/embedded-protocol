@@ -5,4 +5,4 @@ edition = "2021"
 description = "Allocation-free doBT-01X AT command/state engine, independent of UART HAL"
 
 [dependencies]
-at-transport = { path = "../at-transport" }
+embedded-io-async = "0.7"

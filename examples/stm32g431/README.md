@@ -51,6 +51,6 @@ Rust 默认连接 G431-BLE，使用 A003 写入和 A002 notify 接收。实现�
 
 当前为 [BLE v6](../../docs/ble-protocol.md)：HELLO、DATA、ACK 共用 17 字节固定开销，无包尾、无会话号。DATA 捎带累计确认，没有可发送 DATA 时立即发 ACK。固定窗口、不慢启动、不缩窗；每包按 `ceil(完整帧字节数/128) × 100/200/400 ms` 重传，最多发送 8 次。整包 N 字节承载 N−18 字节有效测试数据，不提供跨重启抗重放。
 
-`G431_BENCH_BAUD` 可覆盖编译目标波特率，默认 115200；主机 `--baud` 仅校验，不发送 AT。AT 扫描、配置、复位和回读由 `dobt01-driver::Driver::configure` 完成，板级 AtPort 仅适配 USART1 和 Embassy 时间。
+`G431_BENCH_BAUD` 可覆盖编译目标波特率，默认 115200；主机 `--baud` 仅校验，不发送 AT。AT 扫描、配置、复位等待、超时和回读由板级 `firmware/src/at_setup.rs` 完成；驱动直接使用 USART1 的 `embedded_io_async::Read/Write` 实现，不再定义 AtPort 或时序接口。
 
 v6 已完成烧录、AT 回读、故障注入恢复和短时同时双向验证，尚未重跑完整矩阵。历史矩阵不代表当前版本，测试记录按项目约束清理、不归档。doBT-8AS 是独立可复用驱动，当前板级示例仍连接 doBT-01X，不代表 8AS 已经过实机验证。

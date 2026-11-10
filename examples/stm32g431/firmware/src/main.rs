@@ -5,10 +5,8 @@ use ble_bench_payload as app;
 use ble_link_protocol as bench;
 use core::sync::atomic::{AtomicU32, Ordering};
 use defmt_rtt as _;
-use dobt01_driver::{
-    setup::{Options, Transport},
-    Driver,
-};
+mod at_setup;
+use dobt01_driver::Driver;
 use embassy_executor::Spawner;
 use embassy_stm32::{
     bind_interrupts, peripherals,
@@ -42,79 +40,6 @@ impl embassy_stm32::interrupt::typelevel::Handler<embassy_stm32::interrupt::type
 }
 bind_interrupts!(struct Irqs { USART1 => UartErrorCounter, usart::BufferedInterruptHandler<peripherals::USART1>; RNG => embassy_stm32::rng::InterruptHandler<peripherals::RNG>; });
 const MAX_PACKETS: usize = 8192;
-
-enum AtIoError {
-    Uart(usart::Error),
-    Timeout,
-    Config,
-}
-impl core::fmt::Debug for AtIoError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Uart(e) => f.debug_tuple("Uart").field(e).finish(),
-            Self::Timeout => f.write_str("Timeout"),
-            Self::Config => f.write_str("Config"),
-        }
-    }
-}
-struct AtPort<'a, 'd>(&'a mut BufferedUart<'d>);
-impl Transport for AtPort<'_, '_> {
-    type Error = AtIoError;
-    fn now_ms(&self) -> u64 {
-        Instant::now().as_millis()
-    }
-    async fn set_baud(&mut self, baud: u32) -> Result<(), AtIoError> {
-        let mut cfg = Config::default();
-        cfg.baudrate = baud;
-        cfg.eager_reads = Some(64);
-        defmt::info!("AT UART baud={}", baud);
-        self.0.set_config(&cfg).map_err(|_| AtIoError::Config)
-    }
-    async fn drain(&mut self, idle_ms: u32, max_bytes: usize) -> Result<(), AtIoError> {
-        let mut buf = [0; 128];
-        let mut total = 0;
-        while total < max_bytes {
-            let n = match with_timeout(Duration::from_millis(idle_ms as u64), self.0.read(&mut buf))
-                .await
-            {
-                Ok(Ok(n)) => n,
-                Ok(Err(e)) => return Err(AtIoError::Uart(e)),
-                Err(_) => break,
-            };
-            if n == 0 {
-                break;
-            }
-            total += n;
-        }
-        Ok(())
-    }
-    async fn write(&mut self, bytes: &[u8], timeout_ms: u32) -> Result<(), AtIoError> {
-        defmt::info!("AT TX: {=str}", core::str::from_utf8(bytes).unwrap_or("?"));
-        with_timeout(Duration::from_millis(timeout_ms as u64), async {
-            self.0.write_all(bytes).await?;
-            self.0.flush().await
-        })
-        .await
-        .map_err(|_| AtIoError::Timeout)?
-        .map_err(AtIoError::Uart)
-    }
-    async fn read(&mut self, out: &mut [u8], timeout_ms: u32) -> Result<usize, AtIoError> {
-        match with_timeout(Duration::from_millis(timeout_ms as u64), self.0.read(out)).await {
-            Ok(Ok(n)) => {
-                defmt::info!(
-                    "AT RX: {=str}",
-                    core::str::from_utf8(&out[..n]).unwrap_or("<non-UTF8>")
-                );
-                Ok(n)
-            }
-            Ok(Err(e)) => Err(AtIoError::Uart(e)),
-            Err(_) => Ok(0),
-        }
-    }
-    async fn delay_ms(&mut self, ms: u32) {
-        Timer::after_millis(ms as u64).await;
-    }
-}
 
 /// Submit one complete protocol frame; never insert pauses within its bytes.
 async fn send(
@@ -354,16 +279,16 @@ async fn main(_spawner: Spawner) {
     let target_baud = option_env!("G431_BENCH_BAUD")
         .and_then(|s| s.parse::<u32>().ok())
         .unwrap_or(115200);
-    let ready = match driver
-        .configure(
-            &mut AtPort(&mut uart),
-            Options {
-                name: "G431-BLE",
-                baud: target_baud,
-                ensure_slave: true,
-            },
-        )
-        .await
+    let ready = match at_setup::configure(
+        &mut driver,
+        &mut uart,
+        at_setup::Options {
+            name: "G431-BLE",
+            baud: target_baud,
+            ensure_slave: true,
+        },
+    )
+    .await
     {
         Ok(ready) => ready,
         Err(e) => {

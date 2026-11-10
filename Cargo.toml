@@ -4,7 +4,6 @@ members = [
     "crates/monitor-protocol",
     "crates/dobt01-driver",
     "crates/dobt8as-driver",
-    "crates/at-transport",
     "crates/ble-bench-protocol",
     "crates/ble-link-protocol",
     "crates/ble-bench-payload",

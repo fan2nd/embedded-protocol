@@ -1,7 +1,7 @@
 //! doBT-01X V1.1 manual: CRLF AT commands; default 115200 8N1, no flow control.
 //! A nonblocking command engine. The caller supplies UART I/O and deadlines.
 #![no_std]
-pub mod setup;
+pub mod transaction;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Command {

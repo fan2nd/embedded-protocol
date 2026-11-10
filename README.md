@@ -10,7 +10,6 @@
 |---|---|---|
 | doBT-01X 驱动 | [crates/dobt01-driver](crates/dobt01-driver) | 无堆分配 AT 命令、响应解析、配置/透传状态管理 |
 | 历史 v3 测速帧 | [crates/ble-bench-protocol](crates/ble-bench-protocol) | 独立诊断帧、CRC32C、增量解码、有界确认重传窗口 |
-| AT 传输接口 | [crates/at-transport](crates/at-transport) | 调用方提供的有界传输和时间接口 |
 | doBT-8AS 驱动 | [crates/dobt8as-driver](crates/dobt8as-driver) | 独立从机 AT 驱动，尚未实机验证 |
 | BLE v6 链路 | [crates/ble-link-protocol](crates/ble-link-protocol) | 统一帧、CRC、固定滑动窗口与重传 |
 | 测速载荷 | [crates/ble-bench-payload](crates/ble-bench-payload) | 测试命令、统计及随机包长 |

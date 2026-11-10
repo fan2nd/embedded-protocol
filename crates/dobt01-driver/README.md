@@ -1,6 +1,6 @@
 # dobt01-driver
 
-doBT-01X 的 `no_std`、仅依赖 at-transport、无堆分配 AT 命令状态机。UART、波特率切换、定时器和日志由调用方提供；复位等待及配置步骤由驱动调度；库不依赖 STM32、Embassy 或资源监视器。
+doBT-01X 的 `no_std`、使用 embedded-io-async、无堆分配 AT 命令状态机。UART、波特率扫描/切换、超时、复位等待、配置步骤及日志均由调用方处理；库不依赖 STM32、Embassy 或资源监视器。
 
 - `Driver::begin`：编码查询、角色、波特率和复位指令，一次只允许一个待完成命令。
 - `begin_name`：编码 BLE 名称，应用策略限制为 1–20 字节 ASCII 字母、数字、`-`、`_`，拒绝 CR/LF 注入；这个上限是驱动策略，不宣称是模块手册最大值。
@@ -21,8 +21,10 @@ doBT-01X 的 `no_std`、仅依赖 at-transport、无堆分配 AT 命令状态机
 
 验证：`cargo test --locked -p dobt01-driver`。板级接入见 `examples/stm32g431`。
 
-`setup::Transport` 由板级实现：设置波特率、有限排空、带超时整条写入/flush、带超时读取、单调时间和等待。`execute`/`set_name` 负责事务，整条命令 800 ms 截止；128 B 接收缓冲，超时/I/O 失败自动取消 pending。AT 无事务 ID，排空不能证明任意迟到回复已消失。
+`execute`/`set_name` 直接接受 `embedded_io_async::Read + Write`，使用 `write_all`、`flush` 和异步 `read`。驱动不读取时钟、不延时、不排空输入、不设置本地波特率，也不提供自动 configure。调用方用执行器的 timeout 包裹整个事务；Future 被丢弃或 I/O 失败时自动清除 pending。Read 返回 0 表示 EOF（`UnexpectedEof`），不是超时。
 
-`configure(Options { name, baud, ensure_slave })` 负责扫描支持波特率→查询角色（ER+2 记录不支持）→必要时设从机并回读→查询/设置名称→必要时设置波特率→等待 1 秒→复位→切 UART 波特率→等待 2 秒→回读波特率及名称→连接查询。Reset 可无 OK，但后续回读必须通过；其他设置要求 OK。Ready 分别报告探测波特率、验证后波特率及可选角色/连接状态，ER+2 不是连接成功。`configure` 不自动进入透传；板级应用在有效二进制 HELLO 后调用 `confirm_peer`，禁止后续 AT。
+接收按单字节增量解析，匹配响应后不吞掉后续输入。取消不能撤销已发送字节，调用方必须先让链路静止并排空旧应答；AT 无事务 ID，仍无法区分任意迟到的同类回复。
+
+G431 示例的 `firmware/src/at_setup.rs` 演示应用层扫描波特率、改名、复位等待和回读验证，使用 Embassy 超时；这些策略不属于驱动 API。
 
 这套解析器处理的是模块返回给 MCU 的 AT 回复，不是模块内部用于识别串口数据的 AT 命令解释器。当前手册没有公布模块内部匹配边界，不能声称头部非 AT 就能保证所有载荷不碰撞。
